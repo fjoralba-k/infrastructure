@@ -1,0 +1,101 @@
+version: "3.8"
+
+services:
+  dspostgres:
+    image: postgres:16.2
+    container_name: dspostgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - dspostgres:/var/lib/postgresql
+      - dspostgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=alba
+    # command: postgres -c "listen_addresses='*'"
+    restart: always
+
+  dspgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dspgadmin
+    ports:
+      - "85:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: fjoralba@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: alba
+    volumes:
+      - dspgadmin:/var/lib/pgadmin
+    restart: always
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://dspostgres:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: digitalschool
+
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8080:8080"
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3.13.0-management
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=qendrim.pllana
+      - RABBITMQ_DEFAULT_PASS=123123
+    ports:
+      - "5672:5672" #RabbitMQ main port
+      - "15672:15672" #RabbitMQ management plugin
+    volumes:
+      - ./rabbitmq-data:/var/lib/rabbitmq/mnesia
+    restart: always
+
+  digitalschool:
+    image: ghcr.io/sbm-j24/digitalschool:main
+    container_name: digitalschool
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./configs/digitalschool/application.properties:/app/application.properties
+    environment:
+      - CONFIG_LOCATION=file:/app/application.properties
+    restart: always
+  
+  mailsender:
+    image: ghcr.io/sbm-j24/mailservice:main
+    ports:
+      - "8080"
+    volumes:
+      - ./configs/mailsender/application.properties:/app/application.properties
+    environment:
+      - CONFIG_LOCATION=file:/app/application.properties
+    deploy:
+      replicas: 1
+    restart: always
+
+volumes:
+  dspostgres:
+    external:
+      true
+  dspostgres-data:
+    external:
+      true
+  dspgadmin:
+    external:
+      true
+
+networks:
+  default:
+    external: true
+    name: digitalschool
